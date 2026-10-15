@@ -14,7 +14,6 @@ def limpar_pasta(caminho_pasta: str, dias_retencao: int = None, recursivo: bool 
         recursivo (bool, optional): Indica se as pastas filhas também devem ser percorridas. Defaults to False.
 
     Raises:
-        FileNotFoundError: Se a pasta informada não existir.
         NotADirectoryError: Se o caminho informado não for uma pasta.
         ValueError: Se a quantidade de dias de retenção for negativa.
         Exception: Se ocorrer algum erro inesperado ao limpar a pasta.
@@ -22,7 +21,9 @@ def limpar_pasta(caminho_pasta: str, dias_retencao: int = None, recursivo: bool 
     """
     try:
         if not os.path.exists(caminho_pasta):
-            raise FileNotFoundError(f"A pasta '{caminho_pasta}' não foi encontrada.")
+            os.makedirs(caminho_pasta)
+            logger.info(f"A pasta '{caminho_pasta}' foi criada. Nada para limpar.")
+            return
 
         if not os.path.isdir(caminho_pasta):
             raise NotADirectoryError(f"O caminho '{caminho_pasta}' não é uma pasta.")
