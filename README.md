@@ -1,6 +1,9 @@
 # RPA Exemplo – Registro de Despesas no iProcess
 
-Automação (RPA) em Python que baixa o relatório de despesas (`expenses.xlsx`) do portal **iProcess Web** (ambiente de treinamento), registra cada despesa no sistema via navegador e grava o status de cada registro de volta na própria planilha.
+Automação (RPA) em Python com dois processos, escolhidos pela variável `processo`:
+
+- **Processo 1:** baixa o relatório de despesas (`expenses.xlsx`) do portal **iProcess Web** (ambiente de treinamento), registra cada despesa no sistema via navegador, grava o status de cada registro de volta na própria planilha e envia o relatório por e-mail.
+- **Processo 2:** gera CEPs no site Invertexto, consulta cada CEP na API ViaCEP e envia as duas planilhas resultantes por e-mail.
 
 ## Sumário
 
@@ -33,21 +36,54 @@ rpa-exemplo/
 ├── main.py                              # Ponto de entrada: escolhe o processo a executar
 ├── resources/
 │   └── configs/
-│       └── processo_1.yaml.example      # Modelo das configurações do processo 1
+│       ├── processo_1.yaml.example      # Modelo das configurações do processo 1
+│       └── processo_2.yaml.example      # Modelo das configurações do processo 2
 └── src/
     ├── common/                          # Código compartilhado entre processos
-    │   ├── configs/                     # Parâmetros de execução (.env)
+    │   ├── configs/                     # Parâmetros de execução compartilhados (.env)
     │   ├── schemas/                     # Schemas comuns (credenciais)
-    │   └── utils/                       # Driver Chrome, YAML, limpeza de pasta, espera de arquivo, exceções
+    │   └── utils/                       # Driver Chrome, YAML, limpeza de pasta, espera de arquivo, mover arquivo, e-mail, exceções
     └── processes/
-        └── process_1/                   # Processo 1: registro de despesas
+        ├── process_1/                   # Processo 1: registro de despesas
+        │   ├── processo.py              # Orquestração do processo
+        │   ├── apps/                    # Automação da aplicação web (iprocess_web.py)
+        │   ├── configs/                 # Parâmetros estáticos (processo_1.yaml) e de execução (.env) do processo 1
+        │   ├── files/                   # Leitura/escrita do relatório Excel
+        │   ├── schemas/                 # Modelo de uma despesa (DespesaSchema)
+        │   └── tasks/                   # Regra de negócio: registrar_despesas
+        └── process_2/                   # Processo 2: geração e consulta de CEPs
             ├── processo.py              # Orquestração do processo
-            ├── apps/                    # Automação da aplicação web (iprocess_web.py)
-            ├── configs/                 # Parâmetros estáticos (processo_1.yaml)
-            ├── files/                   # Leitura/escrita do relatório Excel
-            ├── schemas/                 # Modelo de uma despesa (DespesaSchema)
-            └── tasks/                   # Regra de negócio: registrar_despesas
+            ├── apps/                    # Invertexto (Selenium) e ViaCEP (HTTP)
+            ├── configs/                 # Parâmetros estáticos (processo_2.yaml) e de execução (.env) do processo 2
+            ├── files/                   # Escrita das planilhas de CEPs
+            ├── schemas/                 # CepGeradoSchema e CepConsultadoSchema
+            └── tasks/                   # gerar_ceps e consultar_ceps
 ```
+
+### Processo 2 – Geração e consulta de CEPs
+
+```mermaid
+flowchart TD
+    A[main.py] -->|processo = 2| B[executar_processo_2]
+    B --> C[limpar pasta de saída]
+    C --> D[Task 1: gerar N CEPs no Invertexto]
+    D --> E[salvar ceps_gerados.xlsx em temp]
+    E --> F[Task 2: consultar cada CEP na ViaCEP]
+    F --> G[salvar ceps_consultados.xlsx em temp]
+    G --> H[mover planilhas para saída]
+    H --> I[enviar e-mail com as duas planilhas]
+    I --> J[finally: limpar temp e fechar Chrome]
+```
+
+- N vem da variável `quantidade_ceps` (padrão `10`, deve ser maior que zero).
+- Uma falha ao gerar um CEP é registrada no log e o lote segue. A planilha contém só os CEPs gerados com sucesso.
+- Na consulta, cada CEP recebe uma coluna `Status`:
+  - `OK`;
+  - `CEP não encontrado na ViaCEP`, quando a API retorna `{"erro": "true"}`;
+  - `CEP inválido | <cep>`;
+  - `Erro inesperado | <detalhe>`.
+
+  Um erro isolado não interrompe o lote.
 
 ### Camadas e responsabilidades
 
@@ -59,15 +95,16 @@ rpa-exemplo/
 | Aplicação web | `processo_1/apps/iprocess_web.py` | Autenticação, download do relatório e preenchimento do formulário de despesas. |
 | Arquivos | `processo_1/files/relatorio_despesas_excel.py` | Converte o Excel em `DespesaSchema` e reescreve linhas com o status. |
 | Schemas | `processo_1/schemas/`, `common/schemas/` | Validação e conversão de dados com pydantic. |
-| Configuração | `common/configs/`, `processo_1/configs/` | Lê variáveis de ambiente (`.env`) e o YAML do processo. |
-| Utilitários | `common/utils/` | `obter_driver`, `ler_yaml`, `limpar_pasta`, `aguardar_arquivo_criado`, `RegraNegocioError`. |
+| Configuração | `common/configs/`, `processo_N/configs/` | `ParametrosExecucaoCompartilhado` (`.env`, usados por todos os processos), `ParametrosExecucaoProcesso` (`.env`, exclusivos do processo) e `ParametrosEstaticosProcesso` (YAML do processo). |
+| Utilitários | `common/utils/` | `obter_driver`, `ler_yaml`, `limpar_pasta`, `aguardar_arquivo_criado`, `mover_arquivo`, `enviar_email`, `RegraNegocioError`. |
 
 ### Fluxo de execução
 
 ```mermaid
 flowchart TD
     A[main.py] -->|processo = 1| B[executar_processo_1]
-    B --> C[obter_driver: Chrome]
+    B --> B1[limpar pasta de saída]
+    B1 --> C[obter_driver: Chrome]
     C --> D[IprocessWeb: login]
     D --> E[baixar_relatorio_despesas]
     E --> F[RelatorioDespesasExcel.ler]
@@ -75,7 +112,9 @@ flowchart TD
     G --> H[registrar_despesa no iProcess]
     H --> I[atualizar_status na planilha]
     I --> G
-    G -->|fim| J[finally: limpar pasta de download e fechar Chrome]
+    G -->|fim| G1[mover relatório para saída]
+    G1 --> G2[enviar e-mail com o relatório]
+    G2 --> J[finally: limpar pasta de download e fechar Chrome]
 ```
 
 ### Convenções do código
@@ -90,12 +129,12 @@ flowchart TD
 
 ### Seleção do processo
 
-- O processo é definido pela variável `processo`. Hoje só existe o valor `"1"`.
+- O processo é definido pela variável `processo`. Valores aceitos: `"1"` e `"2"`.
 - Qualquer outro valor interrompe a execução com a mensagem "Processo ... não mapeado".
 
 ### Credenciais
 
-- `login_iprocess_web` e `senha_iprocess_web` são obrigatórios e não podem ser vazios.
+- Processo 1: `login_iprocess_web` e `senha_iprocess_web` são obrigatórios e não podem ser vazios.
 
 ### Download do relatório
 
@@ -142,8 +181,9 @@ Para cada despesa, o sistema:
 
 ### Encerramento
 
-- Ao final, **toda** a pasta `diretorio_download` é limpa, de forma recursiva. Isso inclui o `expenses.xlsx` com os status gravados.
-- O navegador Chrome é fechado.
+- No início, a pasta `diretorio_saida` é limpa de forma recursiva.
+- Ao final do registro, o `expenses.xlsx` com os status gravados é movido para `diretorio_saida` e enviado por e-mail aos `destinatarios_email` (se `enviar_email` for `true`).
+- No `finally`, a pasta `diretorio_download` é limpa de forma recursiva e o navegador Chrome é fechado.
 
 ## Configuração
 
@@ -153,18 +193,21 @@ Copie `.env.example` para `.env` e preencha:
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `processo` | Sim | Processo a executar. Atualmente: `1`. |
-| `login_iprocess_web` | Sim | Usuário do iProcess Web. |
-| `senha_iprocess_web` | Sim | Senha do iProcess Web. |
+| `processo` | Sim | Processo a executar. Atualmente: `1` ou `2`. |
+| `login_iprocess_web` | Sim (processo 1) | Usuário do iProcess Web. Exclusiva do processo 1 (`ParametrosExecucaoProcesso`). |
+| `senha_iprocess_web` | Sim (processo 1) | Senha do iProcess Web. Exclusiva do processo 1 (`ParametrosExecucaoProcesso`). |
 | `smtp_servidor` | Sim | Endereço do servidor SMTP usado para enviar o e-mail. |
 | `smtp_porta` | Não | Porta do servidor SMTP. Usa STARTTLS. Padrão: `587`. |
 | `login_smtp` | Sim | Usuário SMTP. Também é o remetente do e-mail. |
 | `senha_smtp` | Sim | Senha do usuário SMTP. |
 | `enviar_email` | Não | `true` envia o e-mail ao final do processo. Com `false`, apenas registra um alerta no log. Padrão: `false`. |
 | `headless` | Não | `true` executa o Chrome sem interface. Padrão: `false`. |
+| `quantidade_ceps` | Não | Exclusiva do processo 2 (`ParametrosExecucaoProcesso`): quantidade de CEPs a gerar. Padrão: `10`. |
 | `ambiente_prd` | Não | Hoje não é utilizada pelo código. Padrão: `false`. |
 
 Valores booleanos são lidos como texto: use `true` ou `false`.
+
+Os parâmetros compartilhados (`processo`, `ambiente_prd`, `headless`, `enviar_email`, `smtp_*`, `login_smtp`, `senha_smtp`) ficam em [parametros_execucao_compartilhado.py](src/common/configs/parametros_execucao_compartilhado.py). Os exclusivos de cada processo ficam em `parametros_execucao_processo.py`, dentro de [process_1/configs/](src/processes/process_1/configs/) e [process_2/configs/](src/processes/process_2/configs/).
 
 ### Configurações do processo 1 (`resources/configs/processo_1.yaml`)
 
@@ -172,8 +215,21 @@ Copie `processo_1.yaml.example` para `processo_1.yaml` e preencha:
 
 | Chave | Descrição |
 |---|---|
-| `diretorio_download` | Pasta onde o relatório é baixado. Será criada se não existir. |
+| `diretorio_download` | Pasta onde o relatório é baixado. Será criada se não existir. É limpa ao final da execução. |
+| `diretorio_saida` | Pasta final do relatório. Será criada se não existir. É limpa no início da execução. |
 | `destinatarios_email` | Lista de e-mails que recebem o relatório ao final do processo. |
+
+### Configurações do processo 2 (`resources/configs/processo_2.yaml`)
+
+Copie `processo_2.yaml.example` para `processo_2.yaml` e preencha:
+
+| Chave | Descrição |
+|---|---|
+| `diretorio_temp` | Pasta onde as planilhas são geradas. É limpa ao final da execução. |
+| `diretorio_saida` | Pasta final das planilhas. É limpa no início da execução. |
+| `destinatarios_email` | Lista de e-mails que recebem as duas planilhas. |
+
+Como `main.py` importa todos os processos, os dois YAMLs precisam existir, mesmo que só um processo seja executado.
 
 ## Como executar
 
@@ -192,8 +248,9 @@ uv sync
 # 2. Criar os arquivos de configuração a partir dos exemplos
 copy .env.example .env
 copy resources\configs\processo_1.yaml.example resources\configs\processo_1.yaml
+copy resources\configs\processo_2.yaml.example resources\configs\processo_2.yaml
 
-# 3. Preencher .env e processo_1.yaml e executar
+# 3. Preencher .env e os YAMLs e executar
 uv run main.py
 ```
 
@@ -202,8 +259,6 @@ uv run main.py
 Itens observados no código atual:
 
 - `ambiente_prd` é lido, mas não é usado.
-- `RegraNegocioError` é importada na tarefa de registro, mas nenhuma regra a lança. Erros de negócio hoje são tratados como erros genéricos.
-- A limpeza final apaga o relatório com os status gravados. O resultado do processamento não fica salvo ao final da execução.
-- O caminho do YAML é relativo e usa separador Windows (`resources\configs\processo_1.yaml`). Ele só funciona se o processo for executado a partir da raiz do projeto.
-- Se `obter_driver` falhar, a variável `driver` não é criada e o `finally` não consegue fechá-la. A falha é suprimida pelo `suppress`.
+- `RegraNegocioError` é importada na tarefa de registro do processo 1, mas nenhuma regra a lança. No processo 2 ela é lançada pela `ViaCepApi`.
+- Os caminhos dos YAMLs são relativos e usam separador Windows (`resources\configs\processo_N.yaml`). Só funcionam se o processo for executado a partir da raiz do projeto.
 - O projeto não possui testes automatizados.
