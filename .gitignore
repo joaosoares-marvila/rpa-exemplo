@@ -29,3 +29,4 @@ downloads/
 
 # Process configs (use the .example files as template)
 resources/configs/*.yaml
+logs/

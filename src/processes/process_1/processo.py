@@ -3,7 +3,7 @@ from contextlib import suppress
 from loguru import logger
 
 from src.common.configs import ParametrosExecucaoCompartilhado
-from src.common.utils import enviar_email, limpar_pasta, mover_arquivo, obter_driver
+from src.common.utils import configurar_log, enviar_email, limpar_pasta, mover_arquivo, obter_driver
 from src.processes.process_1.apps import IprocessWeb
 from src.processes.process_1.configs import ParametrosEstaticosProcesso, ParametrosExecucaoProcesso
 from src.processes.process_1.files import RelatorioDespesasExcel
@@ -17,6 +17,7 @@ def executar_processo_1() -> None:
         Exception: Se ocorrer algum erro crítico durante a execução, uma exceção será lançada com a mensagem de erro.
     """
     driver = None
+    id_log = configurar_log(diretorio_logs=ParametrosEstaticosProcesso.diretorio_logs, nome_processo="processo_1")
     try:
         logger.info("Iniciando processo 1")
 
@@ -72,3 +73,12 @@ def executar_processo_1() -> None:
         )
         with suppress(Exception):
             driver.quit()
+        try:
+            limpar_pasta(
+                caminho_pasta=ParametrosEstaticosProcesso.diretorio_logs,
+                dias_retencao=7,
+                recursivo=True
+            )
+        except Exception as error:
+            logger.warning(f"Não foi possível limpar a pasta de logs | {error}")
+        logger.remove(handler_id=id_log)

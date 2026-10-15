@@ -4,3 +4,5 @@ destinatarios_email:
 diretorio_temp: C:\caminho\para\temp
 
 diretorio_saida: C:\caminho\para\saida
+
+diretorio_logs: C:\caminho\para\logs

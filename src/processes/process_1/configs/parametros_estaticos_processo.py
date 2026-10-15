@@ -2,7 +2,8 @@ from src.common.utils import ler_yaml
 
 
 class ParametrosEstaticosProcesso:
-    __dados = ler_yaml(r"resources\configs\processo_1.yaml")
+    __dados = ler_yaml(caminho_arquivo=r"resources\configs\processo_1.yaml")
     destinatarios_email = __dados["destinatarios_email"]
     diretorio_download = __dados["diretorio_download"]
     diretorio_saida = __dados["diretorio_saida"]
+    diretorio_logs = __dados["diretorio_logs"]

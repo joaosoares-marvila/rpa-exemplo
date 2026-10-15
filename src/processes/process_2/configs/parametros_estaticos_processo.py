@@ -6,3 +6,4 @@ class ParametrosEstaticosProcesso:
     destinatarios_email = __dados["destinatarios_email"]
     diretorio_temp = __dados["diretorio_temp"]
     diretorio_saida = __dados["diretorio_saida"]
+    diretorio_logs = __dados["diretorio_logs"]
