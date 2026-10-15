@@ -53,6 +53,7 @@ def executar_processo_1():
             assunto="Processo 1 - Relatório de despesas",
             corpo="Processo 1 finalizado com sucesso. O relatório de despesas segue em anexo.",
             anexos=[caminho_arquivo_relatorio_despesas],
+            habilitado=ParametrosExecucaoCompartilhado.enviar_email,
         )
 
     except Exception as error:

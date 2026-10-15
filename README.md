@@ -160,6 +160,7 @@ Copie `.env.example` para `.env` e preencha:
 | `smtp_porta` | Não | Porta do servidor SMTP. Usa STARTTLS. Padrão: `587`. |
 | `login_smtp` | Sim | Usuário SMTP. Também é o remetente do e-mail. |
 | `senha_smtp` | Sim | Senha do usuário SMTP. |
+| `enviar_email` | Não | `true` envia o e-mail ao final do processo. Com `false`, apenas registra um alerta no log. Padrão: `false`. |
 | `headless` | Não | `true` executa o Chrome sem interface. Padrão: `false`. |
 | `ambiente_prd` | Não | Hoje não é utilizada pelo código. Padrão: `false`. |
 

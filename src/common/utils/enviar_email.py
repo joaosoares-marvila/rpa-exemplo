@@ -15,6 +15,7 @@ def enviar_email(
     assunto: str,
     corpo: str,
     anexos: list[str] = None,
+    habilitado: bool = False,
 ) -> None:
     """ Envia um e-mail através de um servidor SMTP com STARTTLS e autenticação.
 
@@ -27,11 +28,16 @@ def enviar_email(
         assunto (str): Assunto do e-mail.
         corpo (str): Texto do corpo do e-mail.
         anexos (list[str], optional): Caminhos completos dos arquivos que serão anexados. Defaults to None.
+        habilitado (bool, optional): Quando False, o e-mail não é enviado e apenas um alerta é registrado. Defaults to False.
 
     Raises:
         FileNotFoundError: Se algum dos anexos não existir.
         Exception: Se ocorrer algum erro inesperado ao enviar o e-mail.
     """
+    if not habilitado:
+        logger.warning(f"Envio de e-mail desabilitado. O e-mail '{assunto}' não será enviado.")
+        return
+
     try:
         mensagem = EmailMessage()
         mensagem["From"] = remetente
