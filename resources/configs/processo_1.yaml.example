@@ -1,0 +1,4 @@
+destinatarios_email:
+  - email@exemplo.com.br
+
+diretorio_download: C:\caminho\para\downloads
