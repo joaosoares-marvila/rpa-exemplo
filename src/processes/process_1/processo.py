@@ -3,7 +3,7 @@ from contextlib import suppress
 from loguru import logger
 
 from src.common.configs import ParametrosExecucaoCompartilhado
-from src.common.utils import limpar_pasta, mover_arquivo, obter_driver
+from src.common.utils import enviar_email, limpar_pasta, mover_arquivo, obter_driver
 from src.processes.process_1.apps import IprocessWeb
 from src.processes.process_1.configs import ParametrosEstaticosProcesso
 from src.processes.process_1.files import RelatorioDespesasExcel
@@ -43,6 +43,17 @@ def executar_processo_1():
         )
 
         logger.info("Processo 1 finalizado com sucesso")
+
+        enviar_email(
+            servidor=ParametrosExecucaoCompartilhado.smtp_servidor,
+            porta=ParametrosExecucaoCompartilhado.smtp_porta,
+            remetente=ParametrosExecucaoCompartilhado.credenciais_smtp.login,
+            senha=ParametrosExecucaoCompartilhado.credenciais_smtp.senha,
+            destinatarios=ParametrosEstaticosProcesso.destinatarios_email,
+            assunto="Processo 1 - Relatório de despesas",
+            corpo="Processo 1 finalizado com sucesso. O relatório de despesas segue em anexo.",
+            anexos=[caminho_arquivo_relatorio_despesas],
+        )
 
     except Exception as error:
         raise Exception(f"Erro crítico e inesperado ao executar o processo 1 | {error}")

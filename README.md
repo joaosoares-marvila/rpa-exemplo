@@ -156,6 +156,10 @@ Copie `.env.example` para `.env` e preencha:
 | `processo` | Sim | Processo a executar. Atualmente: `1`. |
 | `login_iprocess_web` | Sim | Usuário do iProcess Web. |
 | `senha_iprocess_web` | Sim | Senha do iProcess Web. |
+| `smtp_servidor` | Sim | Endereço do servidor SMTP usado para enviar o e-mail. |
+| `smtp_porta` | Não | Porta do servidor SMTP. Usa STARTTLS. Padrão: `587`. |
+| `login_smtp` | Sim | Usuário SMTP. Também é o remetente do e-mail. |
+| `senha_smtp` | Sim | Senha do usuário SMTP. |
 | `headless` | Não | `true` executa o Chrome sem interface. Padrão: `false`. |
 | `ambiente_prd` | Não | Hoje não é utilizada pelo código. Padrão: `false`. |
 
@@ -168,7 +172,7 @@ Copie `processo_1.yaml.example` para `processo_1.yaml` e preencha:
 | Chave | Descrição |
 |---|---|
 | `diretorio_download` | Pasta onde o relatório é baixado. Será criada se não existir. |
-| `destinatarios_email` | Lista de e-mails. Hoje não é utilizada pelo código. |
+| `destinatarios_email` | Lista de e-mails que recebem o relatório ao final do processo. |
 
 ## Como executar
 
@@ -196,7 +200,7 @@ uv run main.py
 
 Itens observados no código atual:
 
-- `ambiente_prd` e `destinatarios_email` são lidos, mas não são usados.
+- `ambiente_prd` é lido, mas não é usado.
 - `RegraNegocioError` é importada na tarefa de registro, mas nenhuma regra a lança. Erros de negócio hoje são tratados como erros genéricos.
 - A limpeza final apaga o relatório com os status gravados. O resultado do processamento não fica salvo ao final da execução.
 - O caminho do YAML é relativo e usa separador Windows (`resources\configs\processo_1.yaml`). Ele só funciona se o processo for executado a partir da raiz do projeto.
