@@ -1,0 +1,6 @@
+destinatarios_email:
+  - email@exemplo.com.br
+
+diretorio_temp: C:\caminho\para\temp
+
+diretorio_saida: C:\caminho\para\saida
