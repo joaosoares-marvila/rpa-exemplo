@@ -17,7 +17,7 @@ Visão geral do repositório: [README principal](../../../README.md).
 
 | Camada | Arquivo | Responsabilidade |
 |---|---|---|
-| Orquestração | [processo.py](processo.py) | `executar_processo_1`: cria o driver, faz login, baixa o relatório, lê as despesas, executa a tarefa, move o relatório, envia o e-mail e faz a limpeza final. |
+| Orquestração | [processo.py](processo.py) | `executar_processo_1`: configura o log em arquivo, cria o driver, faz login, baixa o relatório, lê as despesas, executa a tarefa, move o relatório, envia o e-mail e faz a limpeza final (inclusive dos logs). |
 | Regra de negócio | [tasks/registrar_despesas.py](tasks/registrar_despesas.py) | Percorre as despesas, registra cada uma e atualiza o status na planilha. |
 | Aplicação web | [apps/iprocess_web.py](apps/iprocess_web.py) | `IprocessWeb`: autenticação, download do relatório e preenchimento do formulário de despesas. |
 | Arquivos | [files/relatorio_despesas_excel.py](files/relatorio_despesas_excel.py) | `RelatorioDespesasExcel`: converte o Excel em `DespesaSchema` e reescreve linhas com o status. |
@@ -29,7 +29,8 @@ Visão geral do repositório: [README principal](../../../README.md).
 ```mermaid
 flowchart TD
     A[main.py] -->|processo = 1| B[executar_processo_1]
-    B --> B1[limpar pasta de saída]
+    B --> L[configurar log em arquivo]
+    L --> B1[limpar pasta de saída]
     B1 --> C[obter_driver: Chrome]
     C --> D[IprocessWeb: login]
     D --> E[baixar_relatorio_despesas]
@@ -41,6 +42,7 @@ flowchart TD
     G -->|fim| G1[mover relatório para saída]
     G1 --> G2[enviar e-mail com o relatório]
     G2 --> J[finally: limpar pasta de download e fechar Chrome]
+    J --> K[limpar logs com mais de 7 dias]
 ```
 
 ## Regras de negócio
@@ -97,6 +99,11 @@ Se qualquer linha for inválida, a leitura falha e o processo é interrompido (n
 - No início, `diretorio_saida` é limpa de forma recursiva.
 - Ao final do registro, o `expenses.xlsx` com os status é movido para `diretorio_saida` e enviado por e-mail aos `destinatarios_email` (se `enviar_email` for `true`). Assunto: "Processo 1 - Relatório de despesas".
 - No `finally`, `diretorio_download` é limpa de forma recursiva e o Chrome é fechado.
+- Em seguida, os arquivos de `diretorio_logs` com mais de 7 dias (última modificação) são excluídos de forma recursiva e o arquivo de log do processo é desvinculado. Falha nessa limpeza vira aviso no log e não interrompe o processo.
+
+### Logs
+
+- Além do console, os logs são gravados em `diretorio_logs\processo_1_AAAA-MM-DD.log` (um arquivo por dia, UTF-8).
 
 ## Configuração
 
@@ -113,6 +120,7 @@ Arquivo `resources/configs/processo_1.yaml` (modelo em [processo_1.yaml.example]
 |---|---|
 | `diretorio_download` | Pasta onde o relatório é baixado. Criada se não existir. É limpa ao final da execução. |
 | `diretorio_saida` | Pasta final do relatório. Criada se não existir. É limpa no início da execução. |
+| `diretorio_logs` | Pasta dos arquivos de log. Criada se não existir. Arquivos com mais de 7 dias são excluídos ao final da execução. Obrigatória. |
 | `destinatarios_email` | Lista de e-mails que recebem o relatório. |
 
 Variáveis compartilhadas (SMTP, `headless`, `enviar_email`): ver [README principal](../../../README.md#configuração).

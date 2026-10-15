@@ -17,7 +17,7 @@ Visão geral do repositório: [README principal](../../../README.md).
 
 | Camada | Arquivo | Responsabilidade |
 |---|---|---|
-| Orquestração | [processo.py](processo.py) | `executar_processo_2`: valida a quantidade, limpa a saída, cria o driver, executa as duas tarefas, move as planilhas, envia o e-mail e faz a limpeza final. |
+| Orquestração | [processo.py](processo.py) | `executar_processo_2`: configura o log em arquivo, valida a quantidade, limpa a saída, cria o driver, executa as duas tarefas, move as planilhas, envia o e-mail e faz a limpeza final (inclusive dos logs). |
 | Regra de negócio | [tasks/gerar_ceps.py](tasks/gerar_ceps.py) | Gera N CEPs e salva `ceps_gerados.xlsx` em `diretorio_temp`. |
 | Regra de negócio | [tasks/consultar_ceps.py](tasks/consultar_ceps.py) | Lê os CEPs gerados, consulta cada um e salva `ceps_consultados.xlsx` em `diretorio_temp`. |
 | Aplicação web | [apps/invertexto_web.py](apps/invertexto_web.py) | `InvertextoWeb`: Selenium na página `https://www.invertexto.com/gerador-de-cep`. |
@@ -31,7 +31,8 @@ Visão geral do repositório: [README principal](../../../README.md).
 ```mermaid
 flowchart TD
     A[main.py] -->|processo = 2| B[executar_processo_2]
-    B --> C[limpar pasta de saída]
+    B --> L[configurar log em arquivo]
+    L --> C[limpar pasta de saída]
     C --> D[Task 1: gerar N CEPs no Invertexto]
     D --> E[salvar ceps_gerados.xlsx em temp]
     E --> F[Task 2: consultar cada CEP na ViaCEP]
@@ -39,6 +40,7 @@ flowchart TD
     G --> H[mover planilhas para saída]
     H --> I[enviar e-mail com as duas planilhas]
     I --> J[finally: limpar temp e fechar Chrome]
+    J --> K[limpar logs com mais de 7 dias]
 ```
 
 ## Regras de negócio
@@ -79,7 +81,12 @@ flowchart TD
 - No início, `diretorio_saida` é limpa de forma recursiva.
 - As duas planilhas são movidas de `diretorio_temp` para `diretorio_saida` e enviadas por e-mail aos `destinatarios_email` (se `enviar_email` for `true`). Assunto: "Processo 2 - CEPs gerados e consultados".
 - No `finally`, `diretorio_temp` é limpa de forma recursiva e o Chrome é fechado.
+- Em seguida, os arquivos de `diretorio_logs` com mais de 7 dias (última modificação) são excluídos de forma recursiva e o arquivo de log do processo é desvinculado. Falha nessa limpeza vira aviso no log e não interrompe o processo.
 - Erro global: "Erro crítico e inesperado ao executar o processo 2".
+
+### Logs
+
+- Além do console, os logs são gravados em `diretorio_logs\processo_2_AAAA-MM-DD.log` (um arquivo por dia, UTF-8).
 
 ## Configuração
 
@@ -95,6 +102,7 @@ Arquivo `resources/configs/processo_2.yaml` (modelo em [processo_2.yaml.example]
 |---|---|
 | `diretorio_temp` | Pasta onde as planilhas são geradas. É limpa ao final da execução. |
 | `diretorio_saida` | Pasta final das planilhas. É limpa no início da execução. |
+| `diretorio_logs` | Pasta dos arquivos de log. Criada se não existir. Arquivos com mais de 7 dias são excluídos ao final da execução. Obrigatória. |
 | `destinatarios_email` | Lista de e-mails que recebem as duas planilhas. |
 
 Variáveis compartilhadas (SMTP, `headless`, `enviar_email`): ver [README principal](../../../README.md#configuração).

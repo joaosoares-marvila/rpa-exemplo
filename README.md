@@ -13,6 +13,7 @@ Repositório de exemplo de automações (RPA) em Python. Um único ponto de entr
 
 - [Stack](#stack)
 - [Arquitetura](#arquitetura)
+- [Logs](#logs)
 - [Configuração](#configuração)
 - [Como executar](#como-executar)
 - [Pontos de atenção](#pontos-de-atenção)
@@ -52,14 +53,14 @@ Cada processo segue a mesma organização interna:
 
 | Pasta/arquivo | Responsabilidade |
 |---|---|
-| `processo.py` | Orquestração: prepara pastas e driver, chama as tarefas, envia o e-mail e faz a limpeza no `finally`. |
+| `processo.py` | Orquestração: configura o log em arquivo, prepara pastas e driver, chama as tarefas, envia o e-mail e faz a limpeza no `finally` (inclusive dos logs com mais de 7 dias). |
 | `tasks/` | Regra de negócio do processo. |
 | `apps/` | Integração com sites e APIs. |
 | `files/` | Leitura e escrita das planilhas. |
 | `schemas/` | Validação e conversão dos dados (pydantic). |
 | `configs/` | `ParametrosEstaticosProcesso` (YAML do processo) e `ParametrosExecucaoProcesso` (`.env`, exclusivos do processo). |
 
-Código reutilizável fica em `src/common/utils/`: `obter_driver`, `ler_yaml`, `limpar_pasta`, `aguardar_arquivo_criado`, `mover_arquivo`, `enviar_email` e `RegraNegocioError`.
+Código reutilizável fica em `src/common/utils/`: `obter_driver`, `ler_yaml`, `limpar_pasta`, `aguardar_arquivo_criado`, `mover_arquivo`, `enviar_email`, `configurar_log` e `RegraNegocioError`.
 
 ### Convenções do código
 
@@ -67,13 +68,20 @@ Código reutilizável fica em `src/common/utils/`: `obter_driver`, `ler_yaml`, `
 - Nomes de classes, métodos e mensagens em português.
 - Métodos de automação e de arquivos encapsulam erros e relançam com contexto: `Erro ... | <erro original>`.
 - Atributos privados com dupla underscore (`self.__driver`) nas classes de integração.
-- Logs com `loguru` em cada etapa relevante.
+- Logs com `loguru` em cada etapa relevante, gravados também em arquivo (ver [Logs](#logs)).
 - Falha em um item de um lote é registrada e o lote segue; falha global interrompe o processo com "Erro crítico e inesperado ao executar o processo N".
 
 ### Seleção do processo
 
 - O processo é definido pela variável `processo`. Valores aceitos: `"1"` e `"2"`.
 - Qualquer outro valor interrompe a execução com a mensagem "Processo ... não mapeado no RPA Exemplo".
+
+## Logs
+
+- Cada processo grava os logs no console e em um arquivo diário na pasta `diretorio_logs` do seu YAML (`processo_1_AAAA-MM-DD.log` e `processo_2_AAAA-MM-DD.log`). A pasta é criada se não existir.
+- Ao final de cada processo (no `finally`, depois de fechar o Chrome), os arquivos de `diretorio_logs` com última modificação anterior a **7 dias** são excluídos, de forma recursiva. O prazo está fixo em `processo.py`.
+- Se a limpeza dos logs falhar, é registrado um aviso ("Não foi possível limpar a pasta de logs") e o processo não é interrompido.
+- Depois disso, o arquivo de log do processo é desvinculado do `loguru`.
 
 ## Configuração
 
@@ -132,4 +140,6 @@ Itens observados no código atual:
 - `ambiente_prd` é lido, mas não é usado.
 - Os caminhos dos YAMLs são relativos e usam separador Windows (`resources\configs\processo_N.yaml`). Só funcionam se a execução for feita a partir da raiz do projeto.
 - O `finally` de cada processo limpa uma pasta antes de fechar o Chrome; se a limpeza lançar erro, `driver.quit()` não é chamado.
+- `configurar_log` é chamado antes do `try`; se falhar (ex.: pasta de logs inacessível), a exceção sai sem a mensagem "Erro crítico e inesperado ao executar o processo N".
+- `diretorio_logs` é obrigatória nos dois YAMLs; sem ela a importação do módulo de configuração falha.
 - O projeto não possui testes automatizados.
